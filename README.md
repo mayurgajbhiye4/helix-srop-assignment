@@ -102,16 +102,18 @@ I chose **Chroma** because it offers persistent local storage (no external depen
 - No eval harness to measure RAG quality or agent routing accuracy
 - Streaming SSE only partially implemented (response model doesn't adapt)
 
+
 ## What I'd Do With More Time
 
+- **E1: Idempotency**: Implement request deduplication using a unique `request_id` header + hash-based storage to ensure duplicate chat messages return the same response
+- **E2: Escalation agent completion**: Add priority-based ticket routing, SLA assignment based on plan_tier, and automatic escalation workflows
+- **E3: Streaming SSE completion**: Implement true streaming responses that emit token-by-token updates from the LLM using ADK event streaming
+- **E4: Reranking**: Integrate a cross-encoder model (e.g., `ms-marco-MiniLM-L-6-v2`) to rerank top-k retrieved chunks before passing to the LLM
+- **E7: Eval harness**: Build a test suite measuring intent classification accuracy, retrieval quality (precision@k), and end-to-end conversation correctness
 - **Hybrid search**: Combine vector search with BM25 full-text search for better recall on technical queries
 - **Chunk metadata filtering**: Filter by product_area, date, or category before ranking results
-- **Reranking**: Use a cross-encoder to reorder top-k results before passing to the LLM
 - **Guardrails hardening**: Add prompt injection detection and output sanitization
-- **Eval harness**: Build a test harness to measure intent classification accuracy and retrieval quality
 - **Token budgeting**: Dynamically adjust chunk count based on available context window
-- **Session analytics**: Track agent routing decisions and fallback patterns to improve routing
-- **Rate limiting & quotas**: Respect plan_tier limits (free vs pro vs enterprise) in tool calls
 
 ## Time Spent
 
