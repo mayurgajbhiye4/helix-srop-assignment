@@ -1,4 +1,4 @@
-# Helix SROP — [Your Name]
+# Helix SROP — Mayur Gajbhiye
 
 ## Setup
 
@@ -73,3 +73,5 @@ I chose [Chroma / LanceDB / FAISS] because...
 - [ ] E5: Guardrails
 - [ ] E6: Docker
 - [ ] E7: Eval harness
+# helix-srop-assignment
+Helix SROP - Mayur Gajbhiye
