@@ -103,4 +103,14 @@ async def search_docs(query: str, k: int = 5, product_area: str | None = None) -
     - Do you apply a score threshold to filter low-quality results?
     - How do you format chunks for the agent? Include chunk_id so agent can cite.
     """
-    return await asyncio.to_thread(_search_docs_sync, query, k, product_area)
+    chunks = await asyncio.to_thread(_search_docs_sync, query, k, product_area)
+
+    if not chunks:
+        return "No relevant documentation found."
+
+    body = "\n\n".join(
+        f"[score={chunk.score}] (source: {chunk.metadata.get('source', 'unknown')})\n{chunk.content}"
+        for chunk in chunks
+    )
+    chunk_ids = ",".join(chunk.chunk_id for chunk in chunks)
+    return f"{body}\n\n<!-- chunk_ids: {chunk_ids} -->"

@@ -16,8 +16,9 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
-from app.agents.tools import escalation_tools
+from app.agents.tools import escalation_tools, account_tools
 from app.api.errors import SessionNotFoundError, UpstreamTimeoutError
 from app.db.models import AgentTrace, Message
 from app.db.models import Session as DbSession
@@ -259,7 +260,9 @@ def _chunk_ids(value: Any) -> list[str]:
         for item in value:
             found.extend(_chunk_ids(item))
     elif isinstance(value, str):
-        found.extend(re.findall(r"\b[a-f0-9]{64}\b", value))
+        found.extend(re.findall(r"\bchunk_[a-f0-9]{16}\b", value))
+        for match in re.finditer(r"<!-- chunk_ids: ([^>]+) -->", value):
+            found.extend(id_.strip() for id_ in match.group(1).split(",") if id_.strip())
         # Extract ticket references from response text
         found.extend(re.findall(r"\bticket-[a-f0-9]{8}\b", value))
     return list(dict.fromkeys(found))
@@ -329,12 +332,18 @@ async def run(session_id: str, user_message: str, db: AsyncSession) -> PipelineR
     started = time.perf_counter()
 
     escalation_tools.set_db_session(db)
+    account_tools.set_db_session(db)
 
     db_session = await db.get(DbSession, session_id)
     if db_session is None:
         raise SessionNotFoundError(f"Session {session_id} was not found")
 
-    state = SessionState.from_db_dict(db_session.state or {"user_id": db_session.user_id})
+    state = SessionState.from_db_dict(
+            db_session.state or {
+                "user_id": db_session.user_id,
+                "plan_tier": db_session.plan_tier,  # read from the users/sessions table
+            }
+    )
 
     try:
         content, routed_to, tool_calls, retrieved_chunk_ids = await asyncio.wait_for(
@@ -361,6 +370,7 @@ async def run(session_id: str, user_message: str, db: AsyncSession) -> PipelineR
 
     db_session.state = state.to_db_dict()
     db_session.updated_at = datetime.utcnow()
+    flag_modified(db_session, "state")
 
     latency_ms = round((time.perf_counter() - started) * 1000)
     db.add(
@@ -413,12 +423,18 @@ async def run_stream(
     started = time.perf_counter()
 
     escalation_tools.set_db_session(db)
+    account_tools.set_db_session(db)
 
     db_session = await db.get(DbSession, session_id)
     if db_session is None:
         raise SessionNotFoundError(f"Session {session_id} was not found")
 
-    state = SessionState.from_db_dict(db_session.state or {"user_id": db_session.user_id})
+    state = SessionState.from_db_dict(
+            db_session.state or {
+                "user_id": db_session.user_id,
+                "plan_tier": db_session.plan_tier,  # read from the users/sessions table
+            }
+    )
 
     # ── stream ADK events ─────────────────────────────────────────────────────
     tool_calls: list[dict[str, Any]] = []
@@ -496,9 +512,10 @@ async def run_stream(
 
         db_session.state = state.to_db_dict()
         db_session.updated_at = datetime.utcnow()
+        flag_modified(db_session, "state")
 
         latency_ms = round((time.perf_counter() - started) * 1000)
-        db.add(Message(message_id=str(uuid.uuid4()), session_id=session_id, role="user", content=user_message))
+        db.add(Message(message_id=str(uuid.uuid4()), session_id=session_id, role="user", content=user_message, trace_id=trace_id))
         db.add(Message(message_id=str(uuid.uuid4()), session_id=session_id, role="assistant", content=content, trace_id=trace_id))
         db.add(AgentTrace(
             trace_id=trace_id,

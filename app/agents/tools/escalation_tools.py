@@ -85,7 +85,12 @@ async def create_ticket(
         # write ticket_id back to session state
         db_session = await _db_session.get(DbSession, session_id)
         if db_session is not None:
-            state = SessionState.from_db_dict(db_session.state)
+            state = SessionState.from_db_dict(
+                        db_session.state or {
+                            "user_id": db_session.user_id,
+                            "plan_tier": db_session.plan_tier,  # read from the users/sessions table
+                        }
+                    )
             state.latest_ticket_id = db_ticket.ticket_id
             db_session.state = state.to_db_dict()
             db_session.updated_at = datetime.utcnow()
