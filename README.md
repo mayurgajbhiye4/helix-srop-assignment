@@ -32,7 +32,11 @@ curl -s -X POST localhost:8000/v1/chat/$SESSION \
 ## Design Decisions
 
 ### State persistence (which pattern and why)
-I used [Pattern 1/2/3 from the ADK guide] because...
+I used Pattern 3 from the ADK guide: store only compact `SessionState` in the
+database and inject it into the root agent instruction each turn. This keeps the
+context window small, avoids replaying full chat history, and still survives
+process restarts because `user_id`, `plan_tier`, `last_agent`, and `turn_count`
+are persisted in `sessions.state`.
 
 ### Chunking strategy
 I used [heading-aware / sentence-aware / fixed-size] chunking because...

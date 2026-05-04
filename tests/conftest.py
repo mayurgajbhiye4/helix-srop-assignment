@@ -8,14 +8,13 @@ Key fixtures:
 """
 import pytest
 import pytest_asyncio
-from fastapi.testclient import TestClient
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import sessionmaker
 
 from app.db.models import Base
 from app.db.session import get_db
 from app.main import app
-
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -32,11 +31,10 @@ async def setup_test_db():
         await conn.run_sync(Base.metadata.drop_all)
 
 
-@pytest_asyncio.fixture
-async def db() -> AsyncSession:
-    async with TestSessionLocal() as session:
-        yield session
-
+# @pytest_asyncio.fixture
+# async def db()-> AsyncSession:
+#     async with TestSessionLocal() as session:
+#         yield session
 
 @pytest_asyncio.fixture
 async def client(db):
@@ -47,28 +45,79 @@ async def client(db):
     app.dependency_overrides.clear()
 
 
+@pytest_asyncio.fixture
+async def db():
+    """Create an in-memory SQLite database for testing."""
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with async_session() as session:
+        yield session
+
+
 @pytest.fixture
 def mock_adk(monkeypatch):
     """
     Patch the ADK pipeline so tests don't call the real LLM.
-
-    TODO for candidate: patch at the ADK boundary (not at the HTTP layer).
-    The mock should:
-    1. Accept a user message
-    2. Return a canned response with a specified routed_to value
-    3. Allow tests to assert which sub-agent was called
-
-    Example:
-        def mock_run(session_id, message, db):
-            if "rotate" in message.lower():
-                return PipelineResult(
-                    content="To rotate a deploy key...",
-                    routed_to="knowledge",
-                    trace_id="test-trace-001",
-                )
-            ...
-
-        monkeypatch.setattr("app.srop.pipeline.run", mock_run)
     """
-    # TODO: implement mock_adk fixture
-    pass
+    class MockADK:
+        def __init__(self):
+            self.calls = []
+            self.called_agents = []
+
+        async def run_turn(self, session_id, user_message, state):
+            lowered = user_message.lower()
+
+            if "rotate" in lowered or "deploy key" in lowered:
+                routed_to = "knowledge"
+                content = """To rotate a deploy key,
+                             create a replacement key,
+                             update consumers,
+                             then revoke the old key.
+                          """
+                chunk_ids = ["a" * 64]
+                tool_calls = [
+                    {
+                        "tool_name": "search_docs",
+                        "args": {"query": user_message},
+                        "result": {
+                            "chunk_id": chunk_ids[0],
+                            "title": "Deploy key rotation",
+                        },
+                    }
+                ]
+            elif "plan tier" in lowered:
+                routed_to = "account"
+                content = f"Your plan tier is {state.plan_tier}."
+                chunk_ids = []
+                tool_calls = [
+                    {
+                        "tool_name": "get_account_status",
+                        "args": {"user_id": state.user_id},
+                        "result": {"plan_tier": state.plan_tier},
+                    }
+                ]
+            else:
+                routed_to = "smalltalk"
+                content = "I can help with Helix account and knowledge base questions."
+                chunk_ids = []
+                tool_calls = []
+
+            self.calls.append(
+                {
+                    "session_id": session_id,
+                    "message": user_message,
+                    "routed_to": routed_to,
+                    "state": state,
+                }
+            )
+            self.called_agents.append(routed_to)
+            return content, routed_to, tool_calls, chunk_ids
+
+    mock = MockADK()
+    monkeypatch.setattr("app.srop.pipeline._run_adk_turn", mock.run_turn)
+    return mock

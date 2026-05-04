@@ -2,6 +2,7 @@
 Database models — SQLAlchemy 2.x async, Postgres-compatible schema.
 All timestamps UTC. JSON columns store Python dicts/lists.
 """
+import uuid
 from datetime import datetime
 from typing import Any
 
@@ -19,7 +20,7 @@ class User(Base):
     user_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     plan_tier: Mapped[str] = mapped_column(String(16), default="free")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
+    tickets: Mapped[list["Ticket"]] = relationship(back_populates="user")
     sessions: Mapped[list["Session"]] = relationship(back_populates="user")
 
 
@@ -31,11 +32,14 @@ class Session(Base):
     # SessionState serialized as JSON — see app/srop/state.py
     state: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime,
+                                                default=datetime.utcnow,
+                                                onupdate=datetime.utcnow)
 
     user: Mapped["User"] = relationship(back_populates="sessions")
-    messages: Mapped[list["Message"]] = relationship(back_populates="session", order_by="Message.created_at")
-
+    messages: Mapped[list["Message"]] = relationship(back_populates="session",
+                                                    order_by="Message.created_at")
+    tickets: Mapped[list["Ticket"]] = relationship(back_populates="session")
 
 class Message(Base):
     __tablename__ = "messages"
@@ -55,8 +59,28 @@ class AgentTrace(Base):
 
     trace_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     session_id: Mapped[str] = mapped_column(String(64), index=True)
-    routed_to: Mapped[str] = mapped_column(String(32))        # knowledge | account | smalltalk
+    routed_to: Mapped[str] = mapped_column(String(32))
     tool_calls: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     retrieved_chunk_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
     latency_ms: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Ticket(Base):
+    __tablename__ = "tickets"
+
+    ticket_id: Mapped[str] = mapped_column(String(64),
+                             primary_key=True,
+                             default=lambda: str(uuid.uuid4()))
+    session_id: Mapped[str] = mapped_column(String(64), 
+                                            ForeignKey("sessions.session_id"), 
+                                            index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), index=True)
+    summary: Mapped[str] = mapped_column(Text)
+    priority: Mapped[str] = mapped_column(String(16))  # low | medium | high | critical
+    status: Mapped[str] = mapped_column(String(16), default="open")  # open | in_progress | resolved | closed
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    session: Mapped["Session"] = relationship(back_populates="tickets")
+    user: Mapped["User"] = relationship(back_populates="tickets")

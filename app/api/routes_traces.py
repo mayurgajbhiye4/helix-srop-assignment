@@ -1,10 +1,13 @@
 """
 GET /v1/traces/{trace_id} — return the structured trace for one pipeline turn.
 """
-from fastapi import APIRouter, Depends
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.models import AgentTrace
 from app.db.session import get_db
 
 router = APIRouter(tags=["traces"])
@@ -13,7 +16,7 @@ router = APIRouter(tags=["traces"])
 class ToolCallRecord(BaseModel):
     tool_name: str
     args: dict
-    result: dict | str | None
+    result: Any
 
 
 class TraceResponse(BaseModel):
@@ -31,5 +34,15 @@ async def get_trace(
     db: AsyncSession = Depends(get_db),
 ) -> TraceResponse:
     """Return trace for one turn. 404 if not found."""
-    # TODO: query agent_traces table, return or 404
-    raise NotImplementedError
+    trace = await db.get(AgentTrace, trace_id)
+    if trace is None:
+        raise HTTPException(status_code=404, detail="Trace not found")
+
+    return TraceResponse(
+        trace_id=trace.trace_id,
+        session_id=trace.session_id,
+        routed_to=trace.routed_to,
+        tool_calls=trace.tool_calls,
+        retrieved_chunk_ids=trace.retrieved_chunk_ids,
+        latency_ms=trace.latency_ms,
+    )

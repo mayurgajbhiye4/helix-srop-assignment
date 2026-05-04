@@ -32,9 +32,13 @@ async def test_knowledge_query_routes_correctly(client, mock_adk):
     session_id = sess.json()["session_id"]
 
     # Turn 1 — knowledge query
-    r1 = await client.post(f"/v1/chat/{session_id}", json={"content": "How do I rotate a deploy key?"})
+    r1 = await client.post(
+        f"/v1/chat/{session_id}",
+        json={"content": "How do I rotate a deploy key?"},
+    )
     assert r1.status_code == 200
     assert r1.json()["routed_to"] == "knowledge"
+    assert mock_adk.called_agents[-1] == "knowledge"
     trace_id = r1.json()["trace_id"]
 
     # Trace must have chunk IDs
@@ -45,6 +49,7 @@ async def test_knowledge_query_routes_correctly(client, mock_adk):
     # Turn 2 — follow-up in same session
     r2 = await client.post(f"/v1/chat/{session_id}", json={"content": "What is my plan tier?"})
     assert r2.status_code == 200
+    assert mock_adk.called_agents[-1] == "account"
     # Agent should know plan_tier from state — not re-ask
     assert "pro" in r2.json()["reply"].lower()
 

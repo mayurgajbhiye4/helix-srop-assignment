@@ -38,8 +38,49 @@ async def get_recent_builds(user_id: str, limit: int = 5) -> list[BuildSummary]:
     The key evaluation point is that this is wired as an ADK tool
     and the agent correctly invokes it when the user asks about builds.
     """
-    # TODO: implement — query DB or return mock data
-    raise NotImplementedError("Implement get_recent_builds()")
+    builds = [
+        BuildSummary(
+            build_id=f"{user_id}-bld-1042",
+            pipeline="deploy",
+            status="failed",
+            branch="main",
+            started_at=datetime(2026, 5, 2, 9, 42, 0),
+            duration_seconds=418,
+        ),
+        BuildSummary(
+            build_id=f"{user_id}-bld-1041",
+            pipeline="test",
+            status="passed",
+            branch="feature/rag-routing",
+            started_at=datetime(2026, 5, 2, 8, 17, 0),
+            duration_seconds=231,
+        ),
+        BuildSummary(
+            build_id=f"{user_id}-bld-1040",
+            pipeline="build",
+            status="passed",
+            branch="main",
+            started_at=datetime(2026, 5, 1, 22, 8, 0),
+            duration_seconds=189,
+        ),
+        BuildSummary(
+            build_id=f"{user_id}-bld-1039",
+            pipeline="deploy",
+            status="cancelled",
+            branch="release/2026-05",
+            started_at=datetime(2026, 5, 1, 18, 31, 0),
+            duration_seconds=73,
+        ),
+        BuildSummary(
+            build_id=f"{user_id}-bld-1038",
+            pipeline="test",
+            status="passed",
+            branch="fix/webhook-retry",
+            started_at=datetime(2026, 5, 1, 15, 4, 0),
+            duration_seconds=264,
+        ),
+    ]
+    return builds[: max(0, limit)]
 
 
 async def get_account_status(user_id: str) -> AccountStatus:
@@ -48,5 +89,11 @@ async def get_account_status(user_id: str) -> AccountStatus:
 
     For the take-home: mock data is fine.
     """
-    # TODO: implement
-    raise NotImplementedError("Implement get_account_status()")
+    return AccountStatus(
+        user_id=user_id,
+        plan_tier="pro",
+        concurrent_builds_used=2,
+        concurrent_builds_limit=10,
+        storage_used_gb=37.4,
+        storage_limit_gb=250.0,
+    )

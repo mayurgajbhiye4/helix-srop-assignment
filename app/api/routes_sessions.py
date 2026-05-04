@@ -7,7 +7,10 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.models import Session as DbSession
+from app.db.models import User
 from app.db.session import get_db
+from app.srop.state import SessionState
 
 router = APIRouter(tags=["sessions"])
 
@@ -32,5 +35,14 @@ async def create_session(
     Initialize SessionState and persist to DB.
     """
     session_id = str(uuid.uuid4())
-    # TODO: upsert user, create session row with initial state, commit
-    raise NotImplementedError
+    user = await db.get(User, body.user_id)
+    if user is None:
+        db.add(User(user_id=body.user_id, plan_tier=body.plan_tier))
+    else:
+        user.plan_tier = body.plan_tier
+
+    state = SessionState(user_id=body.user_id, plan_tier=body.plan_tier)
+    db.add(DbSession(session_id=session_id, user_id=body.user_id, state=state.to_db_dict()))
+    await db.commit()
+
+    return CreateSessionResponse(session_id=session_id, user_id=body.user_id)
