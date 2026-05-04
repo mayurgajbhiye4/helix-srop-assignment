@@ -108,17 +108,8 @@ async def search_docs(query: str, k: int = 5, product_area: str | None = None) -
     if not chunks:
         return "No relevant documentation found."
 
-    return chunks
-
-
-def format_chunks_for_agent(chunks: list[DocChunk]) -> str:
-    """Render DocChunks into a markdown string the agent can include in its context."""
-    if not chunks:
-        return "No relevant documentation found."
-
     body = "\n\n".join(
-        f"[score={chunk.score}] (source: {chunk.metadata.get('source', 'unknown')})\n"
-        f"{chunk.content}"
+        f"[score={chunk.score}] (source: {chunk.metadata.get('source', 'unknown')})\n{chunk.content}"
         for chunk in chunks
     )
     chunk_ids = ",".join(chunk.chunk_id for chunk in chunks)
