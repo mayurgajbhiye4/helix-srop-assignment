@@ -25,9 +25,58 @@ curl -s -X POST localhost:8000/v1/chat/$SESSION \
 
 ## Architecture
 
-```
-[ASCII diagram here]
-```
+┌─────────────────────────────────────────────────────────────┐
+│ FastAPI REST API │
+│ POST /v1/sessions | POST /v1/chat | GET /v1/traces │
+└──────────────┬──────────────────────────────────────────────┘
+│
+▼
+┌─────────────────────────────────────────────────────────────┐
+│ SROP Pipeline (pipeline.py) │
+│ 1. Load SessionState from DB │
+│ 2. Build ADK root agent with state context │
+│ 3. Run user message through orchestrator │
+│ 4. Extract routed_to + tool calls from ADK events │
+│ 5. Persist updated state + trace to SQLite │
+│ 6. Return reply + metadata │
+└──────────────┬──────────────────────────────────────────────┘
+│
+┌───────┴────────────────────────────┐
+│ │
+▼ ▼
+┌──────────────────────┐ ┌──────────────────────┐
+│ Root Orchestrator │ │ SessionState (DB) │
+│ (ADK LlmAgent) │ │ - user_id │
+│ Routes intent │ │ - plan_tier │
+│ via AgentTool │ │ - last_agent │
+└──────────────────────┘ │ - turn_count │
+│ └──────────────────────┘
+│
+┌───┼───┬──────────────┐
+│ │ │ │
+▼ ▼ ▼ ▼
+┌──────────┐ ┌──────────────┐ ┌────────────────┐
+│Knowledge │ │ Account │ │ Escalation │
+│Agent │ │ Agent │ │ Agent │
+│[ADK] │ │ [ADK] │ │ [ADK] │
+└──────────┘ └──────────────┘ └────────────────┘
+│ │ │
+▼ ▼ ▼
+┌──────────┐ ┌──────────────┐ ┌────────────────┐
+│search_ │ │get_recent_ │ │create_ │
+│docs() │ │builds() │ │ticket() │
+│ │ │get_account │ │ │
+│[RAG] │ │_status() │ │[Mocks] │
+└──────────┘ └──────────────┘ └────────────────┘
+│
+▼
+┌──────────────────────────────┐
+│ Chroma Vector Store │
+│ (PersistentClient) │
+│ - 10 markdown docs chunked │
+│ - Cosine similarity (HNSW) │
+│ - Google embeddings │
+└──────────────────────────────┘
 
 ## Design Decisions
 
@@ -39,34 +88,46 @@ process restarts because `user_id`, `plan_tier`, `last_agent`, and `turn_count`
 are persisted in `sessions.state`.
 
 ### Chunking strategy
-I used [heading-aware / sentence-aware / fixed-size] chunking because...
+I used **hybrid heading-aware + sentence-aware chunking (Strategy B/C combined)** because the Helix docs are structured in Markdown with clear section headings. The strategy splits on `##` and `###` headings first (preserving structural context), then sub-chunks large sections using sentence boundaries to maintain coherence within the 512-character chunk size. This balances heading context preservation with retrieval granularity.
 
 ### Vector store choice
-I chose [Chroma / LanceDB / FAISS] because...
+I chose **Chroma** because it offers persistent local storage (no external dependencies), built-in support for similarity search with cosine distance and HNSW indexing for performance, and integration with Google's embedding API. The schema naturally stores chunk IDs, scores, and metadata (product_area, source file) needed for citation tracking.
 
 ## Known Limitations
 
-- ...
+- No idempotency guards on ticket creation (E1 extension not implemented)
+- Escalation agent is basic; no priority-based routing or SLA tracking
+- No reranking step to improve retrieval quality
+- Vector store schema doesn't support advanced filtering by product_area or recency
+- No eval harness to measure RAG quality or agent routing accuracy
+- Streaming SSE only partially implemented (response model doesn't adapt)
 
 ## What I'd Do With More Time
 
-- ...
+- **Hybrid search**: Combine vector search with BM25 full-text search for better recall on technical queries
+- **Chunk metadata filtering**: Filter by product_area, date, or category before ranking results
+- **Reranking**: Use a cross-encoder to reorder top-k results before passing to the LLM
+- **Guardrails hardening**: Add prompt injection detection and output sanitization
+- **Eval harness**: Build a test harness to measure intent classification accuracy and retrieval quality
+- **Token budgeting**: Dynamically adjust chunk count based on available context window
+- **Session analytics**: Track agent routing decisions and fallback patterns to improve routing
+- **Rate limiting & quotas**: Respect plan_tier limits (free vs pro vs enterprise) in tool calls
 
 ## Time Spent
 
 | Phase | Time |
 |-------|------|
-| Setup + DB + FastAPI boilerplate | |
-| RAG ingest + search_docs | |
-| ADK agents | |
-| pipeline.py + state persistence | |
-| Tests | |
-| README | |
-| **Total** | |
+| Setup + DB + FastAPI boilerplate | 60 min |
+| RAG ingest + chunking strategy | 90 min |
+| ADK agents + AgentTool pattern | 90 min |
+| pipeline.py + state persistence | 180 min |
+| Tests + error handling | 60 min |
+| README + Architecture | 30 min |
+| **Total** | 510 min (≈ 8.5 hrs) |
 
 ## Extensions Completed
 
-- [Failed] E1: Idempotency
+- [No] E1: Idempotency
 - [Partial] E2: Escalation agent
 - [Partial] E3: Streaming SSE
 - [No] E4: Reranking
