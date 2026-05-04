@@ -3,8 +3,8 @@
 ## Setup
 
 ```bash
-git clone <your-repo>
-cd helix-srop
+git clone https://github.com/mayurgajbhiye4/helix-srop-assignment
+cd helix-srop-assignment
 uv sync
 cp .env.example .env  # fill in GOOGLE_API_KEY
 uv run python -m app.rag.ingest --path docs/
@@ -66,12 +66,10 @@ I chose [Chroma / LanceDB / FAISS] because...
 
 ## Extensions Completed
 
-- [ ] E1: Idempotency
-- [ ] E2: Escalation agent
-- [ ] E3: Streaming SSE
-- [ ] E4: Reranking
-- [ ] E5: Guardrails
-- [ ] E6: Docker
-- [ ] E7: Eval harness
-# helix-srop-assignment
-Helix SROP - Mayur Gajbhiye
+- [Failed] E1: Idempotency
+- [Partial] E2: Escalation agent
+- [Partial] E3: Streaming SSE
+- [No] E4: Reranking
+- [Yes] E5: Guardrails
+- [Yes] E6: Docker
+- [No] E7: Eval harness
