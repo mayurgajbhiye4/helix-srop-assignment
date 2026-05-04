@@ -2,10 +2,17 @@
 
 ## Setup
 
+### For pytest (clean clone, no API key needed)
+
 ```bash
 git clone https://github.com/mayurgajbhiye4/helix-srop-assignment
 cd helix-srop-assignment
 uv sync
+uv run pytest -q
+```
+
+### For manual testing with live LLM
+```bash
 cp .env.example .env  # fill in GOOGLE_API_KEY
 uv run python -m app.rag.ingest --path docs/
 uv run uvicorn app.main:app --reload
