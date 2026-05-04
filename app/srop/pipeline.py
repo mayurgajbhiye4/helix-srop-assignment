@@ -18,7 +18,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.agents.tools import escalation_tools, account_tools
+from app.agents.tools import account_tools, escalation_tools
 from app.api.errors import SessionNotFoundError, UpstreamTimeoutError
 from app.db.models import AgentTrace, Message
 from app.db.models import Session as DbSession
@@ -515,8 +515,16 @@ async def run_stream(
         flag_modified(db_session, "state")
 
         latency_ms = round((time.perf_counter() - started) * 1000)
-        db.add(Message(message_id=str(uuid.uuid4()), session_id=session_id, role="user", content=user_message, trace_id=trace_id))
-        db.add(Message(message_id=str(uuid.uuid4()), session_id=session_id, role="assistant", content=content, trace_id=trace_id))
+        db.add(Message(message_id=str(uuid.uuid4()),
+                       session_id=session_id,
+                       role="user",
+                       content=user_message,
+                       trace_id=trace_id))
+        db.add(Message(message_id=str(uuid.uuid4()),
+                       session_id=session_id,
+                       role="assistant",
+                       content=content,
+                       trace_id=trace_id))
         db.add(AgentTrace(
             trace_id=trace_id,
             session_id=session_id,
@@ -528,7 +536,12 @@ async def run_stream(
         await db.commit()
 
         # ── final frame ───────────────────────────────────────────────────────────
-        yield f"event: done\ndata: {json.dumps({'reply': content, 'routed_to': routed_to, 'trace_id': trace_id})}\n\n"
+        done_payload = json.dumps({
+                "reply": content,
+                "routed_to": routed_to,
+                "trace_id": trace_id,
+            })
+        yield f"event: done\ndata: {done_payload}\n\n"
 
     except Exception as exc:
         # Surface the error as an SSE frame so the client sees it

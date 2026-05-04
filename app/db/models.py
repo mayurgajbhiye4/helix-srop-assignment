@@ -72,15 +72,16 @@ class Ticket(Base):
     ticket_id: Mapped[str] = mapped_column(String(64),
                              primary_key=True,
                              default=lambda: str(uuid.uuid4()))
-    session_id: Mapped[str] = mapped_column(String(64), 
-                                            ForeignKey("sessions.session_id"), 
+    session_id: Mapped[str] = mapped_column(String(64),
+                                            ForeignKey("sessions.session_id"),
                                             index=True)
     user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), index=True)
     summary: Mapped[str] = mapped_column(Text)
-    priority: Mapped[str] = mapped_column(String(16))  # low | medium | high | critical
-    status: Mapped[str] = mapped_column(String(16), default="open")  # open | in_progress | resolved | closed
+    priority: Mapped[str] = mapped_column(String(16))
+    status: Mapped[str] = mapped_column(String(16), default="open")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow,
+                                                onupdate=datetime.utcnow)
 
     session: Mapped["Session"] = relationship(back_populates="tickets")
     user: Mapped["User"] = relationship(back_populates="tickets")

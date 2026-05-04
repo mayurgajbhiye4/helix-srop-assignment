@@ -56,7 +56,6 @@ def _chunk_id(source_path: str, chunk_index: int) -> str:
 def chunk_markdown(text: str, chunk_size: int = 512, overlap: int = 64) -> list[str]:
     """
     Split markdown text using heading-aware chunking (Strategy C).
-    
     Splits on ## and ### headings, then sub-chunks large sections by sentence.
     This preserves document structure and heading context.
     """

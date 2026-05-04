@@ -8,8 +8,8 @@ TODO for candidate: implement these tools.
 """
 from dataclasses import dataclass
 from datetime import datetime
+
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.srop.state import SessionState
 
 _db_session: AsyncSession | None = None
 
