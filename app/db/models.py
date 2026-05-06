@@ -30,7 +30,7 @@ class Session(Base):
     session_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"), index=True)
     # SessionState serialized as JSON — see app/srop/state.py
-    state: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    state: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime,
                                                 default=datetime.utcnow,

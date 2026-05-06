@@ -12,11 +12,16 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 _db_session: AsyncSession | None = None
+_plan_tier: str = "free"
 
 def set_db_session(db: AsyncSession) -> None:
     """Set the database session for tool use."""
     global _db_session
     _db_session = db
+    
+def set_plan_tier(plan_tier: str) -> None:  # ← add this
+    global _plan_tier
+    _plan_tier = plan_tier
 
 @dataclass
 class BuildSummary:
@@ -92,17 +97,13 @@ async def get_recent_builds(user_id: str, limit: int = 5) -> list[BuildSummary]:
 
 
 async def get_account_status(user_id: str) -> AccountStatus:
-    plan_tier = "free"
-
-    if _db_session is not None:
-        from app.db.models import User
-        user = await _db_session.get(User, user_id)
-        if user is not None:
-            plan_tier = user.plan_tier
-
+    """
+    Return account status for a user.
+    plan_tier is set per-request from session state, not queried from DB.
+    """
     return AccountStatus(
         user_id=user_id,
-        plan_tier=plan_tier,
+        plan_tier=_plan_tier,
         concurrent_builds_used=2,
         concurrent_builds_limit=10,
         storage_used_gb=37.4,

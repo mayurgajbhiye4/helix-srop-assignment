@@ -21,7 +21,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.agents.tools import account_tools, escalation_tools
 from app.api.errors import SessionNotFoundError, UpstreamTimeoutError
 from app.db.models import AgentTrace, Message
-from app.db.models import Session as DbSession
+from app.db.models import Session as DbSession, User
 from app.settings import settings
 from app.srop.state import SessionState
 
@@ -338,12 +338,17 @@ async def run(session_id: str, user_message: str, db: AsyncSession) -> PipelineR
     if db_session is None:
         raise SessionNotFoundError(f"Session {session_id} was not found")
 
-    state = SessionState.from_db_dict(
-            db_session.state or {
-                "user_id": db_session.user_id,
-                "plan_tier": db_session.plan_tier,  # read from the users/sessions table
-            }
+    if db_session.state:
+        state = SessionState.from_db_dict(db_session.state)
+    else:
+    # state column is NULL/empty — reconstruct from the User row
+        user = await db.get(User, db_session.user_id)
+        state = SessionState(
+            user_id=db_session.user_id,
+            plan_tier=user.plan_tier if user else "free",
     )
+    
+    account_tools.set_plan_tier(state.plan_tier)
 
     try:
         content, routed_to, tool_calls, retrieved_chunk_ids = await asyncio.wait_for(
@@ -429,12 +434,17 @@ async def run_stream(
     if db_session is None:
         raise SessionNotFoundError(f"Session {session_id} was not found")
 
-    state = SessionState.from_db_dict(
-            db_session.state or {
-                "user_id": db_session.user_id,
-                "plan_tier": db_session.plan_tier,  # read from the users/sessions table
-            }
+    if db_session.state:
+        state = SessionState.from_db_dict(db_session.state)
+    else:
+    # state column is NULL/empty — reconstruct from the User row
+        user = await db.get(User, db_session.user_id)
+        state = SessionState(
+            user_id=db_session.user_id,
+            plan_tier=user.plan_tier if user else "free",
     )
+    
+    account_tools.set_plan_tier(state.plan_tier)
 
     # ── stream ADK events ─────────────────────────────────────────────────────
     tool_calls: list[dict[str, Any]] = []
