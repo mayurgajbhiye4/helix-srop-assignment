@@ -132,7 +132,8 @@ I chose **Chroma** because it offers persistent local storage (no external depen
 | pipeline.py + state persistence | 180 min |
 | Tests + error handling | 60 min |
 | README + Architecture | 30 min |
-| **Total** | 510 min (≈ 8.5 hrs) |
+|Bug Fixes              | 180 min |
+| **Total** | 690 min (≈ 11.5 hrs) |
 
 ## Extensions Completed
 
